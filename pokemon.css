@@ -1,0 +1,108 @@
+*{
+    text-transform: capitalize;
+}
+
+body {
+    margin: 0;
+    border: none;
+    background: lightgrey;
+}
+
+/*logo*/
+
+.logo {
+
+    max-width:  5%;
+    height: auto;
+
+}
+/*nav*/
+
+.topnav {
+    overflow: hidden;
+    background-color: #f7f7f7;
+}
+
+.searchbar{
+    width: 100%;
+    text-align: center;
+    margin-top: 30px;
+}
+
+#window{
+    width: calc(100% - 100px);
+    height: 240px;
+    border-radius: 10px;
+    margin: 50px auto;
+    background: black;
+    text-align: center;
+    color: white;
+}
+#pokemon_picture{
+    width: calc(33.33%);
+    height: 80%;
+    border: none;
+    color: white;
+}
+
+#evochain{
+    width: calc(100% - 100px);
+    margin: 50px auto;
+    background: black;
+    color: white;
+    text-align: center;
+    align-items: center;
+    border-radius: 10px;
+    padding: 5px;
+}
+.evo_block{
+    display: block;
+}
+
+.evolink{
+    width: calc(33.33% - 10px);
+    height: 100px;
+}
+
+#name_tag{
+    background: black;
+    border-radius: 10px;
+    text-align: center;
+    color: #f7f7f7;
+    width: 180px;
+    height: 30px;
+}
+.container{
+    display: inline-block;
+    width: calc(50% - 10px);
+}
+.card{
+    width: 50%;
+    height: 680px;
+    background: #f7f7f7;
+    border-radius: 10px;
+}
+.card1{
+    float: right;
+    margin-right: 10px;
+
+}
+.card2{
+    float: left;
+    margin-left: 10px;
+}
+.move_set{
+    width: calc(100% - 100px);
+    margin: 50px auto;
+    text-align: center;
+    border: black solid 1px;
+    border-radius: 10px;
+}
+.move_block{
+    display: inline-block;
+    text-align: center;
+    padding: 5px;
+    width: calc(45% - 20px);
+    margin: 5px;
+    height: 25px;
+}
