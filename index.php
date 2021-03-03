@@ -1,171 +1,154 @@
 <?php
 
+use JetBrains\PhpStorm\Pure;
+
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
-const POINT_TO_START = 1;
-const MOVE_SET_SIZE = 4;
+session_start();
 
-//General fetch functions.
+const MOVE_SET = 4;
+const API_POKEMON = 'https://pokeapi.co/api/v2/pokemon/';
+const API_SPECIES = 'https://pokeapi.co/api/v2/pokemon-species/';
+const LINK_NEW = '/pokemon.js/pokedex-revised/index.php?find=';
+const ID_RANGE = [1, 898];
 
-function FetchName($input)
+//functions
+
+function catchError(): void
 {
-    if (isset($input['species']['name']) && !empty($input['species']['name'])){
-        return $input['species']['name'];
+    if (isset($_SESSION['error']) && $_SESSION['error'] === true) {
+        $_SESSION['error'] = false;
+        echo 'Invalid Pokemon or ID';
     }
-    return 'Invalid Name';
 }
 
-function FetchPokemon($input)
+function fetchData($input, $API): array
 {
     try {
-        $json = json_decode(file_get_contents('https://pokeapi.co/api/v2/pokemon/' . $input), true, 512, JSON_THROW_ON_ERROR);
+        $json = json_decode(file_get_contents($API . $input), true, 512, JSON_THROW_ON_ERROR);
     } catch (JsonException) {
-        $json = null;
+        $_SESSION['error'] = true;
+        header("Location: /pokemon.js/pokedex-revised/index.php?find=");
+        exit;
     }
-    return $json;
+    return $json ?? [];
 }
 
-function FetchSprite($input){
-    return $input['sprites']['other']['official-artwork']['front_default'] ?? ('2.png');
-}
+function fetchEvo($input): array
+{
+    $species = fetchData($input, API_SPECIES);
 
-    //Fetch on input
-    if (isset($_GET['find']) && !empty($_GET['find'])) {
-    $json = FetchPokemon(htmlspecialchars($_GET['find'], ENT_NOQUOTES));
-}else{$json = FetchPokemon(POINT_TO_START);}
-    
-    $sprite = FetchSprite($json);
-    $name = FetchName($json);
-    $id = $json['id'] ?? '';
-    $moves = $json['moves'] ?? [];
-    $species = $json['species']['url'] ?? '';
-
-    //Echo Pokemon Image && Name && Id
-    function ShowCase($sprite, $id, $name)
-    {
-        echo '<img id="pokemon_picture" src=' . $sprite . ' alt="pokemon image"><br/>';
-        echo '<div>' . '#' . str_pad($id, 3, '0', STR_PAD_LEFT) . ' ' . $name . '</div>';
+    if ($species === []) {
+        return [];
     }
 
-    //Collect & Echo move set.
-    function MoveSet($moves)
-    {if(isset($moves) && !empty($moves)){
-        shuffle($moves);
-        $size = (MOVE_SET_SIZE < count($moves)) ? MOVE_SET_SIZE : count($moves);
-        array_splice($moves, $size);
+    try {
+        $evoData = json_decode(file_get_contents($species['evolution_chain']['url']), true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        $_SESSION['error'] = true;
+        header("Location: /pokemon.js/pokedex-revised/index.php?find=");
+        exit;
+    }
 
-        echo 'Move Set:<br/>';
-        foreach ($moves AS $move) {
-            echo '<div class="move_block">' . $move['move']['name'] . '</div>';
+    $firstStage = [fetchData(fetchName($evoData['chain']), API_POKEMON)];
+    $secondStage = [];
+    $thirdStage = [];
+
+    foreach ($evoData['chain']['evolves_to'] as $evolution) {
+        $data = fetchData(fetchName($evolution), API_POKEMON);
+        $secondStage[] = $data;
+        foreach ($evolution['evolves_to'] as $evolution2) {
+            $data = fetchData(fetchName($evolution2), API_POKEMON);
+            $thirdStage[] = $data;
         }
-    }else{ echo '<div class="move_block">No Moves Found</div>';}
+    }
+    return [$firstStage, $secondStage, $thirdStage];
 
+}
+
+#[Pure] function fetchId($input): string
+{
+    if (isset($input['id']) && !empty($input['id'])) {
+        return str_pad($input['id'], 3, '0', STR_PAD_LEFT);
+    }
+    return '000';
+}
+
+function fetchName($input): string
+{
+    return $input['species']['name'] ?? 'Invalid Name';
+}
+
+function fetchSprite($input): string
+{
+    return $input['sprites']['other']['official-artwork']['front_default'] ?? ('');
+}
+
+function printMoveSet($moves): void
+{
+    if (!isset($moves) && !empty($moves)) {
+        echo '<div class="move">No Moves Found</div>';
+        return;
     }
 
-    //Collect & Echo evolution chain for $species.
-    function Evolution($species)
-    {
-        if (isset($species) && !empty($species)) {
-            try {
-                $json = json_decode(file_get_contents($species), true, 512, JSON_THROW_ON_ERROR);
-            } catch (JsonException) {return;
-            }
-            try {
-                $json = json_decode(file_get_contents($json['evolution_chain']['url']), true, 512, JSON_THROW_ON_ERROR);
-            } catch (JsonException) {return;
-            }
+    $size = min(MOVE_SET, count($moves));
+    shuffle($moves);
+    array_splice($moves, $size);
 
-            $base_form = [];
-            $first_form = [];
-            $second_form = [];
-
-            //base form.
-
-            $base_form[] = FetchPokemon(FetchName($json['chain']));
-
-            //first & second forms.
-
-            foreach ($json['chain']['evolves_to'] as $first) {
-                $data = FetchPokemon(FetchName($first));
-                $first_form[] = $data;
-                foreach ($first['evolves_to'] as $second) {
-                    $data = FetchPokemon(FetchName($second));
-                    $second_form[] = $data;
-                }
-            }
-
-            function PrintChain($target)
-            {
-                if (!empty($target)) {
-
-                    //Open html div:
-
-                    echo '<div class="evo_block">';
-
-                    //Echo image of every evolution of that tier:
-
-                    foreach ($target as $sprite) {
-                        $title = FetchName($sprite);
-                        if ($title === POINT_TO_START) {
-                            $title = 'Invalid';
-                        }
-                        echo '<a href=http://pokedex.local/index.php?find=' . FetchName($sprite) . ' title=' . $title . '>';
-                        echo '<img class="evolink" alt="" src=' . FetchSprite($sprite) . '>';
-                        echo '</a>';
-                    }
-
-                    //Close html div.
-                    echo '</div>';
-
-                }else{ echo '<div><p>No Pokemon Found</p></div>';}
-            }
-
-            PrintChain($base_form);
-            PrintChain($first_form);
-            PrintChain($second_form);
-        }else{ echo '<div><p>No Pokemon Found</p></div>';}
+    foreach ($moves as $move) {
+        echo '<div class="move">' . $move['move']['name'] . '</div>';
     }
-    
-?>
 
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Pokédex</title>
-    <link rel="stylesheet" href="pokemon.css">
-    <link rel="shortcut icon" href="#"/>
-</head>
-<body>
+}
 
-<form action="" method="get" class="searchbar">
-    <label for="find"></label>
-    <input type="text" id="find" name="find" placeholder="Enter Name or ID">
-    <input type="submit" id="run" value="Find this pokemon">
-</form>
-<div class="container">
-    <div class="card card1">
-        <div id="window">
-            <?php
-                ShowCase($sprite, $id, $name);
-            ?>
-        </div>
+function printEvoChain($chain): void
+{
+    foreach ($chain as $link) {
+        foreach ($link as $evoStage) {
+            echo '<div class="evoSlot">'
+                . '<a href=' . LINK_NEW . fetchName($evoStage) . ' class="evoLink">'
+                . '<img id="showSprite" class="evoSprite" src=' . fetchSprite($evoStage) . ' alt="pokemon image">'
+                . '<div class="evoTag">#' . fetchId($evoStage) . ' ' . fetchName($evoStage) . '</div>' .
+                '</div>';
+        }
+    }
 
-        <div class="move_set">
-            <?php
-                MoveSet($moves);
-            ?>
-        </div>
-    </div>
-</div>
-<div class="container">
-    <div class="card card2">
-        <div id="evochain">
-            <?php
-                Evolution($species);
-            ?>
-        </div>
-    </div>
-</div>
-</body>
+}
+
+function slideButton($current, $direction): void
+{
+    //$direction: prev || next;
+    if (!isset($current) || empty($current)) {
+        return;
+    }
+    $location = (int)fetchId($current);
+
+    switch ($direction) {
+
+        case 'prev':
+            if (($location - 1) >= ID_RANGE[0]) {
+                echo '<a href=' . LINK_NEW . ($location - 1) . ' class="evoLink">';
+            }
+            break;
+        case 'next':
+            if (($location + 1) <= ID_RANGE[1]) {
+                echo '<a href=' . LINK_NEW . ($location + 1) . ' class="evoLink">';
+            }
+            break;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['find']) && !empty($_GET['find'])) {
+
+    $pokemon = htmlspecialchars($_GET['find'], ENT_NOQUOTES);
+    $pokeData = fetchData($pokemon, API_POKEMON);
+    $evoData = fetchEvo($pokemon);
+
+    $pokemonSprite = '<img id="showSprite" class="pokemonSprite" src=' . fetchSprite($pokeData) . ' alt="pokemon image">';
+    $pokemonTag = '#' . fetchId($pokeData) . ' ' . fetchName($pokeData);
+
+}
+
+require 'pokedex-frame.php';
